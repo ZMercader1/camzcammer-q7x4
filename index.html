@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#07080a">
+  <meta name="color-scheme" content="dark">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="CamZcammer">
+  <title>CamZcammer</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/logo.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <!-- Lista de facturas -->
+  <section id="v-lista" class="vista">
+    <header class="barra">
+      <div class="marca">
+        <img src="icons/logo.svg" alt="" width="34" height="34">
+        <span>CamZ<em>cammer</em></span>
+      </div>
+      <button id="chip-sync" class="chip-sync" type="button"></button>
+      <button id="btn-ajustes" class="btn-icono" type="button" aria-label="Ajustes"></button>
+    </header>
+
+    <div class="trimestre">
+      <button id="t-prev" class="btn-icono" type="button" aria-label="Trimestre anterior"></button>
+      <div class="t-centro">
+        <div id="t-titulo" class="t-titulo"></div>
+        <div id="t-sub" class="t-sub"></div>
+      </div>
+      <button id="t-next" class="btn-icono" type="button" aria-label="Trimestre siguiente"></button>
+    </div>
+
+    <div id="resumen" class="resumen"></div>
+    <main id="lista" class="lista"></main>
+
+    <button id="btn-escanear" class="fab" type="button"></button>
+  </section>
+
+  <!-- Cámara -->
+  <section id="v-camara" class="vista oscura">
+    <video id="video" playsinline muted autoplay></video>
+    <canvas id="overlay"></canvas>
+    <div id="cam-aviso" class="cam-aviso" hidden></div>
+    <header class="cam-top">
+      <button id="cam-cerrar" class="btn-cristal" type="button" aria-label="Cerrar"></button>
+      <div id="cam-estado" class="cam-estado"></div>
+      <button id="cam-flash" class="btn-cristal" type="button" aria-label="Flash"></button>
+    </header>
+    <footer class="cam-bottom">
+      <button id="cam-galeria" class="btn-cristal grande" type="button" aria-label="Elegir foto"></button>
+      <button id="cam-disparar" class="disparador" type="button" aria-label="Hacer foto"><span></span></button>
+      <button id="cam-listo" class="cam-listo" type="button" hidden>
+        <img id="cam-mini" alt="">
+        <b id="cam-num">1</b>
+      </button>
+      <div id="cam-hueco" class="cam-hueco"></div>
+    </footer>
+  </section>
+
+  <!-- Recorte -->
+  <section id="v-recorte" class="vista oscura">
+    <header class="barra transparente">
+      <button id="rec-cancelar" class="btn-texto" type="button">Repetir</button>
+      <div class="barra-titulo">Ajusta las esquinas</div>
+      <button id="rec-auto" class="btn-texto" type="button">Todo</button>
+    </header>
+    <div id="rec-escena" class="rec-escena">
+      <canvas id="rec-canvas"></canvas>
+      <svg id="rec-svg"></svg>
+      <canvas id="rec-lupa" class="lupa" width="220" height="220" hidden></canvas>
+    </div>
+    <footer class="rec-pie">
+      <button id="rec-detectar" class="btn-cristal grande" type="button" aria-label="Detectar bordes"></button>
+      <button id="rec-ok" class="btn-primario" type="button">Aceptar</button>
+    </footer>
+  </section>
+
+  <!-- Revisar y guardar -->
+  <section id="v-revisar" class="vista">
+    <header class="barra">
+      <button id="rev-descartar" class="btn-icono" type="button" aria-label="Descartar"></button>
+      <div class="barra-titulo" id="rev-titulo">Nueva factura</div>
+      <span class="hueco-icono"></span>
+    </header>
+    <div class="rev-scroll">
+      <div id="rev-paginas" class="paginas"></div>
+      <div id="rev-filtros" class="segmentos filtros" role="radiogroup" aria-label="Filtro"></div>
+
+      <form id="rev-form" class="form" autocomplete="off">
+        <label class="campo">
+          <span>Proveedor</span>
+          <input id="f-proveedor" name="proveedor" list="proveedores" placeholder="Ej. Gasolina Ballenoil" enterkeyhint="next" autocapitalize="words">
+          <datalist id="proveedores"></datalist>
+        </label>
+        <div id="f-sugeridos" class="sugeridos"></div>
+        <div class="fila-campos">
+          <label class="campo">
+            <span>Importe €</span>
+            <input id="f-importe" name="importe" inputmode="decimal" placeholder="0,00" enterkeyhint="done">
+          </label>
+          <label class="campo">
+            <span>Fecha</span>
+            <input id="f-fecha" name="fecha" type="date" required>
+          </label>
+        </div>
+        <label class="campo">
+          <span>Referencia <i>opcional</i></span>
+          <input id="f-ref" name="ref" placeholder="Nº de factura o pedido" enterkeyhint="done">
+        </label>
+
+        <div class="campo">
+          <span>Guardar en</span>
+          <div id="f-destino" class="segmentos destino" role="radiogroup" aria-label="Destino"></div>
+        </div>
+        <div id="f-ruta" class="ruta"></div>
+      </form>
+    </div>
+    <footer class="pie-fijo">
+      <button id="rev-guardar" class="btn-primario ancho" type="button">Guardar</button>
+    </footer>
+  </section>
+
+  <!-- Detalle -->
+  <section id="v-detalle" class="vista">
+    <header class="barra">
+      <button id="det-volver" class="btn-icono" type="button" aria-label="Volver"></button>
+      <div class="barra-titulo" id="det-titulo"></div>
+      <button id="det-editar" class="btn-icono" type="button" aria-label="Editar"></button>
+    </header>
+    <div class="det-scroll">
+      <div id="det-paginas" class="det-paginas"></div>
+      <div id="det-info" class="det-info"></div>
+      <div id="det-acciones" class="det-acciones"></div>
+    </div>
+  </section>
+
+  <!-- Hojas -->
+  <div id="velo" class="velo" hidden></div>
+  <div id="hoja" class="hoja" role="dialog" aria-modal="true" hidden></div>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <div id="ocupado" class="ocupado" hidden><div class="spinner"></div><span id="ocupado-txt"></span></div>
+  <input id="file-in" type="file" accept="image/*" multiple hidden>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
