@@ -181,6 +181,23 @@ export async function renderizar(p, filtro) {
   return p.salida;
 }
 
+/** Página preparada para leer texto: gris limpio, margen blanco y tamaño moderado. */
+export function imagenOcr(p) {
+  if (!p.enderezada) {
+    const quad = encoger(p.quad, 0.012);
+    p.enderezada = enderezar(imageData(p.original), quad, tamanoSalida(quad, MAX_PAGINA));
+  }
+  const img = aCanvas(filtrar(rotar(p.enderezada, p.rotacion), 'gris'));
+  const s = Math.min(1, 1600 / img.width);
+  const margen = 30;
+  const c = canvas(Math.round(img.width * s) + margen * 2, Math.round(img.height * s) + margen * 2);
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, c.width, c.height);
+  ctx.drawImage(img, margen, margen, c.width - margen * 2, c.height - margen * 2);
+  return c;
+}
+
 export async function miniatura(blob, max = 240) {
   const bmp = await createImageBitmap(blob);
   const c = reducir(bmp, bmp.width, bmp.height, max);

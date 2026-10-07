@@ -4,7 +4,7 @@ import { icon } from './icons.js';
 import { ajustes, guardarAjustes, DESTINOS } from './settings.js';
 import { sincronizar, pdfDe, necesitaSubida } from './sync.js';
 import {
-  Camara, Detector, cargarArchivo, nuevaPagina, renderizar, miniatura, marcoCompleto, reducir,
+  Camara, Detector, cargarArchivo, nuevaPagina, renderizar, miniatura, marcoCompleto, reducir, imagenOcr,
 } from './scan.js';
 import { FILTROS, ordenarEsquinas } from './image.js';
 import { crearPdf } from './pdf.js';
@@ -13,6 +13,8 @@ import {
   rutaDropbox, nombreArchivo,
 } from './naming.js';
 import { VERSION } from './config.js';
+import { leerTexto, precargar } from './ocr.js';
+import { analizar, TIPO_IDS, conTipo, tipoDe } from './extraer.js';
 
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g,
@@ -699,14 +701,101 @@ function abrirRevisar() {
     $('#f-importe').value = '';
     $('#f-ref').value = '';
     $('#f-fecha').value = hoy();
+    document.querySelectorAll('#rev-form input').forEach((i) => i.classList.remove('auto'));
     b.destino = ajustes().destino;
+    b.tocados = new Set();
     pintarSugeridos();
+    pintarTipos();
   }
   segmentos($('#rev-filtros'), FILTROS, b.filtro, (v) => { b.filtro = v; pintarPaginas(); });
   segmentos($('#f-destino'), DESTINOS, b.destino, (v) => { b.destino = v; pintarRuta(); });
   pintarPaginas();
   pintarRuta();
+  pintarOcr();
+  if (ajustes().leerFacturas && !b.ocr) leerFactura(b);
 }
+
+// ----------------------------------------------------------------- lectura automática
+
+function proveedoresOrdenados() {
+  const cuenta = new Map();
+  for (const f of estado.facturas) {
+    if (!f.proveedor) continue;
+    const c = cuenta.get(f.proveedor) || { n: 0, ult: 0 };
+    c.n++;
+    c.ult = Math.max(c.ult, f.creado);
+    cuenta.set(f.proveedor, c);
+  }
+  return [...cuenta].sort((a, b) => b[1].n - a[1].n || b[1].ult - a[1].ult).map(([p]) => p);
+}
+
+/** Lee la primera página y rellena los campos que el usuario no ha tocado. Nunca bloquea. */
+async function leerFactura(b) {
+  const pag = b.paginas[0];
+  b.ocr = { estado: 'leyendo', pag };
+  pintarOcr();
+  try {
+    await asegurarRender(pag); // primero la vista previa; luego se lee
+    const texto = await leerTexto(imagenOcr(pag));
+    if (estado.borrador !== b || b.ocr?.pag !== pag) return;
+    const r = analizar(texto, { anteriores: proveedoresOrdenados() });
+    let rellenos = 0;
+    const poner = (campo, sel, valor) => {
+      if (valor == null || valor === '' || b.tocados.has(campo)) return;
+      const el = $(sel);
+      el.value = valor;
+      el.classList.add('auto');
+      rellenos++;
+    };
+    poner('proveedor', '#f-proveedor', r.proveedor);
+    poner('importe', '#f-importe', r.importe != null ? formatImporte(r.importe) : null);
+    poner('fecha', '#f-fecha', r.fecha);
+    poner('ref', '#f-ref', r.ref);
+    b.ocr.estado = rellenos ? 'hecho' : 'nada';
+    window.__czUltimoOcr = { texto, r };
+  } catch (e) {
+    if (estado.borrador !== b || !b.ocr) return;
+    b.ocr.estado = 'error';
+    b.ocr.error = e.message;
+  }
+  pintarOcr();
+  pintarTipos();
+  pintarRuta();
+}
+
+function pintarOcr() {
+  const el = $('#f-ocr');
+  const o = estado.borrador?.ocr;
+  if (!o || !ajustes().leerFacturas) { el.hidden = true; return; }
+  el.hidden = false;
+  el.className = `ocr-estado ${o.estado}`;
+  el.innerHTML = {
+    leyendo: `${icon('loader', 'gira')}<span>Leyendo la factura…</span>`,
+    hecho: `${icon('wand')}<span>Datos leídos de la factura. Revísalos.</span>`,
+    nada: `${icon('wand')}<span>No he sacado datos claros; rellénalos tú.</span>`,
+    error: `${icon('alert')}<span>No se pudo leer la factura.</span>`,
+  }[o.estado] || '';
+}
+
+const ETIQUETA_TIPO = { Envio: 'Envío' };
+
+function pintarTipos() {
+  const actual = tipoDe($('#f-proveedor').value);
+  $('#f-tipos').innerHTML = TIPO_IDS.map((t) =>
+    `<button type="button" class="btn-chip ${t === actual ? 'on' : ''}" data-tipo="${t}">${ETIQUETA_TIPO[t] || t}</button>`).join('');
+}
+
+$('#f-tipos').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-tipo]');
+  if (!b || !estado.borrador) return;
+  const inp = $('#f-proveedor');
+  const tipo = b.dataset.tipo === tipoDe(inp.value) ? null : b.dataset.tipo;
+  inp.value = conTipo(inp.value, tipo);
+  estado.borrador.tocados.add('proveedor');
+  inp.classList.remove('auto');
+  pintarTipos();
+  pintarRuta();
+});
 
 function pintarPaginas() {
   const b = estado.borrador;
@@ -752,7 +841,8 @@ $('#rev-paginas').addEventListener('click', async (e) => {
   } else if (btn.dataset.acc === 'borrar') {
     b.paginas.splice(i, 1);
     if (p.salida?.url) URL.revokeObjectURL(p.salida.url);
-    if (!b.paginas.length) abrirCamara(); else pintarPaginas();
+    if (i === 0) b.ocr = null; // se leerá la nueva primera página
+    if (!b.paginas.length) abrirCamara(); else abrirRevisar();
   }
 });
 
@@ -773,9 +863,18 @@ $('#f-sugeridos').addEventListener('click', (e) => {
   const b = e.target.closest('button');
   if (!b) return;
   $('#f-proveedor').value = b.textContent;
+  estado.borrador?.tocados?.add('proveedor');
+  $('#f-proveedor').classList.remove('auto');
+  pintarTipos();
   pintarRuta();
 });
-['#f-proveedor', '#f-importe', '#f-fecha', '#f-ref'].forEach((s) => $(s).addEventListener('input', pintarRuta));
+['#f-proveedor', '#f-importe', '#f-fecha', '#f-ref'].forEach((s) => $(s).addEventListener('input', (e) => {
+  // Lo que toca el usuario ya no lo sobrescribe la lectura automática.
+  estado.borrador?.tocados?.add(e.target.name);
+  e.target.classList.remove('auto');
+  if (e.target.name === 'proveedor') pintarTipos();
+  pintarRuta();
+}));
 
 function datosForm() {
   const txtImporte = $('#f-importe').value.trim();
@@ -1100,6 +1199,7 @@ async function abrirAjustes() {
       <label class="interruptor"><span>Abrir directamente la cámara</span><input type="checkbox" id="aj-camara" ${a.empezarEnCamara ? 'checked' : ''}><i></i></label>
       <label class="interruptor"><span>Usar la cámara del iPhone<small>Máxima resolución y flash real</small></span><input type="checkbox" id="aj-nativa" ${a.camaraNativa ? 'checked' : ''}><i></i></label>
       <label class="interruptor"><span>Disparo automático<small>Hace la foto cuando la factura está quieta</small></span><input type="checkbox" id="aj-auto" ${a.autoDisparo ? 'checked' : ''}><i></i></label>
+      <label class="interruptor"><span>Leer los datos de la factura<small>Proveedor, tipo, importe, fecha y nº, sin salir del móvil</small></span><input type="checkbox" id="aj-ocr" ${a.leerFacturas ? 'checked' : ''}><i></i></label>
       <label class="interruptor"><span>Revisar siempre el recorte</span><input type="checkbox" id="aj-recorte" ${a.confirmarRecorte ? 'checked' : ''}><i></i></label>
     </div>
 
@@ -1121,6 +1221,7 @@ async function abrirAjustes() {
     segmentos(h.querySelector('#aj-destino'), DESTINOS, a.destino, (v) => guardarAjustes({ destino: v }));
     segmentos(h.querySelector('#aj-filtro'), FILTROS, a.filtro, (v) => guardarAjustes({ filtro: v }));
     h.querySelector('#aj-camara').onchange = (e) => guardarAjustes({ empezarEnCamara: e.target.checked });
+    h.querySelector('#aj-ocr').onchange = (e) => guardarAjustes({ leerFacturas: e.target.checked });
     h.querySelector('#aj-nativa').onchange = (e) => guardarAjustes({ camaraNativa: e.target.checked });
     h.querySelector('#aj-auto').onchange = (e) => guardarAjustes({ autoDisparo: e.target.checked });
     h.querySelector('#aj-recorte').onchange = (e) => guardarAjustes({ confirmarRecorte: e.target.checked });
@@ -1175,6 +1276,7 @@ function iconosFijos() {
   $('#t-prev').innerHTML = icon('left');
   $('#t-next').innerHTML = icon('right');
   $('#btn-escanear').innerHTML = `${icon('camera')}<span>Escanear</span>`;
+  $('#btn-galeria').innerHTML = icon('image');
   $('#cam-cerrar').innerHTML = icon('x');
   $('#cam-galeria').innerHTML = icon('image');
   $('#rec-detectar').innerHTML = icon('wand');
@@ -1189,6 +1291,10 @@ function eventosFijos() {
   $('#t-prev').onclick = () => moverTrimestre(-1);
   $('#t-next').onclick = () => moverTrimestre(1);
   $('#btn-escanear').onclick = abrirCamara;
+  $('#btn-galeria').onclick = () => {
+    if (!estado.borrador) estado.borrador = { paginas: [], filtro: ajustes().filtro };
+    elegirArchivo(false);
+  };
   $('#cam-cerrar').onclick = () => {
     if (estado.borrador?.paginas.length) { abrirRevisar(); return; }
     descartarBorrador();
@@ -1239,6 +1345,8 @@ async function iniciar() {
   else if (ajustes().empezarEnCamara && !ajustes().camaraNativa) abrirCamara();
 
   if (dbx.conectado() && !dbx.cuentaGuardada()) dbx.cuenta().catch(() => {});
+  // El lector de texto se descarga en segundo plano para que esté listo al escanear.
+  if (ajustes().leerFacturas) setTimeout(precargar, 2500);
   sincronizarYA();
 }
 

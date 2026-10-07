@@ -1,6 +1,9 @@
 // Service worker: la app funciona sin conexión (en el coche, en un parking...).
 // Al cambiar cualquier archivo, sube VERSION para que los móviles se actualicen.
-const VERSION = 'cz-1.1.1';
+const VERSION = 'cz-1.2.0';
+// Las librerías pesadas (OpenCV, Tesseract) van en su propia caché y no se vuelven a
+// descargar con cada versión de la app.
+const VENDOR = 'cz-vendor-1';
 const APP = [
   './',
   'index.html',
@@ -19,7 +22,8 @@ const APP = [
   'js/sync.js',
   'js/detector.js',
   'js/detect-worker.js',
-  'vendor/opencv.js',
+  'js/ocr.js',
+  'js/extraer.js',
   'icons/logo.svg',
   'icons/apple-touch-icon.png',
   'icons/icon-192.png',
@@ -27,13 +31,16 @@ const APP = [
 ];
 
 self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(VERSION).then((c) => c.addAll(APP)).then(() => self.skipWaiting()));
+  e.waitUntil(Promise.all([
+    caches.open(VERSION).then((c) => c.addAll(APP)),
+    caches.open(VENDOR).then(async (c) => { if (!(await c.match('vendor/opencv.js'))) await c.add('vendor/opencv.js'); }),
+  ]).then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', (e) => {
   e.waitUntil(
     caches.keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== VERSION).map((k) => caches.delete(k))))
+      .then((keys) => Promise.all(keys.filter((k) => k !== VERSION && k !== VENDOR).map((k) => caches.delete(k))))
       .then(() => self.clients.claim()),
   );
 });
@@ -49,7 +56,7 @@ self.addEventListener('fetch', (e) => {
     caches.match(clave, { ignoreSearch: req.mode === 'navigate' }).then((hit) => hit || fetch(req).then((res) => {
       if (res.ok && res.type === 'basic') {
         const copia = res.clone();
-        caches.open(VERSION).then((c) => c.put(req, copia));
+        caches.open(url.pathname.includes('/vendor/') ? VENDOR : VERSION).then((c) => c.put(req, copia));
       }
       return res;
     })),

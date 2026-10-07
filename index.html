@@ -40,6 +40,7 @@
     <div id="resumen" class="resumen"></div>
     <main id="lista" class="lista"></main>
 
+    <button id="btn-galeria" class="fab-galeria" type="button" aria-label="Añadir desde la galería"></button>
     <button id="btn-escanear" class="fab" type="button"></button>
   </section>
 
@@ -97,6 +98,11 @@
       <div id="rev-filtros" class="segmentos filtros" role="radiogroup" aria-label="Filtro"></div>
 
       <form id="rev-form" class="form" autocomplete="off">
+        <div id="f-ocr" class="ocr-estado" hidden></div>
+        <div class="campo">
+          <span>Tipo</span>
+          <div id="f-tipos" class="tipos"></div>
+        </div>
         <label class="campo">
           <span>Proveedor</span>
           <input id="f-proveedor" name="proveedor" list="proveedores" placeholder="Ej. Gasolina Ballenoil" enterkeyhint="next" autocapitalize="words">

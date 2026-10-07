@@ -15,7 +15,7 @@ guarda en el móvil, en Dropbox o en ambos, siguiendo la estructura de `FACTURAS
 ## Desarrollo
 
 ```
-node --test tests/core.test.js
+node --test tests/core.test.js tests/extraer.test.js
 ```
 
 Cualquier cambio publicado necesita subir `VERSION` en `sw.js` para que los móviles se actualicen.

@@ -215,6 +215,18 @@ button:disabled { opacity: 0.4; cursor: default; }
   box-shadow: 0 10px 30px rgba(200, 255, 46, 0.25), 0 2px 0 rgba(255, 255, 255, 0.4) inset;
   transition: transform 0.12s ease;
 }
+.fab-galeria {
+  position: fixed;
+  left: calc(50% + 104px);
+  bottom: calc(var(--bottom) + 28px);
+  width: 50px; height: 50px;
+  display: grid; place-items: center;
+  border-radius: 50%;
+  background: var(--surface-2);
+  border: 1px solid var(--line-2);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+.fab-galeria:active { background: var(--surface-3); }
 .fab .ico { width: 24px; height: 24px; stroke-width: 2.2; }
 .fab:active { transform: translateX(-50%) scale(0.96); }
 
@@ -472,6 +484,25 @@ button:disabled { opacity: 0.4; cursor: default; }
 .sugeridos { display: flex; gap: 6px; overflow-x: auto; margin: -6px -16px 0; padding: 0 16px; scrollbar-width: none; }
 .sugeridos::-webkit-scrollbar { display: none; }
 .sugeridos:empty { display: none; }
+
+.ocr-estado {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  font-size: 13px; font-weight: 600;
+  background: var(--surface); border: 1px solid var(--line);
+  color: var(--muted);
+}
+.ocr-estado .ico { width: 18px; height: 18px; flex: none; }
+.ocr-estado.hecho { color: var(--accent); background: var(--accent-soft); border-color: rgba(200, 255, 46, 0.3); }
+.ocr-estado.error { color: var(--warn); }
+.campo input.auto {
+  border-color: rgba(200, 255, 46, 0.55);
+  background: linear-gradient(0deg, rgba(200, 255, 46, 0.06), rgba(200, 255, 46, 0.06)), var(--surface);
+}
+.tipos { display: flex; gap: 6px; overflow-x: auto; margin: 0 -16px; padding: 0 16px; scrollbar-width: none; }
+.tipos::-webkit-scrollbar { display: none; }
+.btn-chip.on { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
 
 .ruta {
   display: flex; gap: 10px; align-items: flex-start;
