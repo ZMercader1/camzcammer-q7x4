@@ -41,3 +41,22 @@ export function fotoSintetica(w = 720, h = 860, hoja = HOJA) {
   }
   return { data, width: w, height: h };
 }
+
+/** Escena nocturna sin documento: cielo oscuro, un poste claro vertical, farolas y un cartel pequeño. */
+export function escenaPoste(w = 480, h = 860) {
+  const data = new Uint8ClampedArray(w * h * 4);
+  let seed = 11;
+  const rnd = () => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * 4;
+      let v = y < h * 0.55 ? 25 + rnd() * 10 : 70 + rnd() * 30; // cielo / suelo
+      if (x > 150 && x < 330) v = 120 + 40 * Math.sin(((x - 150) / 180) * Math.PI); // poste
+      if (x > 200 && x < 280 && y > 420 && y < 540) v = 210; // cartel pequeño
+      if (Math.hypot(x - 90, y - 400) < 8 || Math.hypot(x - 400, y - 420) < 8) v = 255; // farolas
+      if (y > h * 0.55 && Math.abs((y - h * 0.55) - (x - 300) * 0.3) < 3) v = 200; // línea de la calzada
+      data[i] = v * 1.05; data[i + 1] = v; data[i + 2] = v * 0.8; data[i + 3] = 255;
+    }
+  }
+  return { data, width: w, height: h };
+}

@@ -334,7 +334,7 @@ function arrancarBucle() {
         try {
           const r = await detector.detectar(video, video.videoWidth, video.videoHeight, 360);
           if (id !== bucle) return;
-          quadObjetivo = r && r.cobertura > 0.08 ? r.puntos : null;
+          estabilizar(r, video);
           vigilarQuietud(r, video);
         } catch { /* siguiente vuelta */ }
       }
@@ -387,6 +387,25 @@ function arrancarBucle() {
   requestAnimationFrame(frame);
 }
 
+// El recuadro solo aparece cuando dos detecciones seguidas coinciden, y desaparece tras
+// varios fallos seguidos. Así no salta de un sitio a otro con cada fotograma.
+let candidato = null;
+let fallos = 0;
+function estabilizar(r, video) {
+  const tol = 0.05 * Math.max(video.videoWidth, video.videoHeight);
+  const cerca = (a, b) => a.every((p, i) => Math.hypot(p.x - b[i].x, p.y - b[i].y) < tol);
+  if (r && r.cobertura > 0.12) {
+    if (candidato && cerca(r.puntos, candidato)) quadObjetivo = r.puntos;
+    else if (quadObjetivo && !cerca(r.puntos, quadObjetivo)) fallos++;
+    candidato = r.puntos;
+    if (quadObjetivo && cerca(r.puntos, quadObjetivo)) fallos = 0;
+  } else {
+    candidato = null;
+    fallos++;
+  }
+  if (fallos >= 3) { quadObjetivo = null; fallos = 0; }
+}
+
 /** Con el disparo automático activo, dispara cuando las esquinas no se mueven durante un rato. */
 function vigilarQuietud(r, video) {
   if (!ajustes().autoDisparo || capturando || !r || r.cobertura < 0.2) { quieto.ref = null; return; }
@@ -403,7 +422,7 @@ async function detectarEn(c) {
   if (!detector?.listo) return null;
   try {
     const r = await detector.detectar(c, c.width, c.height);
-    return r && r.cobertura > 0.08 ? r.puntos : null;
+    return r && r.cobertura > 0.12 ? r.puntos : null;
   } catch {
     return null;
   }
@@ -426,7 +445,7 @@ async function disparar() {
 
 async function nuevaFoto(foto) {
   const quad = await detectarEn(foto);
-  const pag = nuevaPagina(foto, quad || marcoCompleto(foto.width, foto.height));
+  const pag = nuevaPagina(foto, quad || marcoCompleto(foto.width, foto.height, 0.1));
   pag.detectado = quad;
   if (quad && !ajustes().confirmarRecorte) {
     estado.borrador.paginas.push(pag);
@@ -483,16 +502,21 @@ function abrirRecorte(pag, { nueva }) {
   requestAnimationFrame(pintarRecorte);
 }
 
+// El cuadro y las esquinas se pintan en un canvas que cubre toda la escena (no en SVG: en
+// Safari de iPhone no se veían), así las esquinas no se cortan aunque estén en el borde.
 function pintarRecorte() {
   if (!rec) return;
-  const esc0 = $('#rec-escena');
-  const W = esc0.clientWidth - 32;
-  const H = esc0.clientHeight - 32;
+  const escena = $('#rec-escena');
+  const W = escena.clientWidth;
+  const H = escena.clientHeight;
   const o = rec.pag.original;
-  const s = Math.min(W / o.width, H / o.height);
-  rec.escala = s;
+  const margen = 28;
+  const s = Math.min((W - margen * 2) / o.width, (H - margen * 2) / o.height);
   const cw = Math.round(o.width * s);
   const ch = Math.round(o.height * s);
+  rec.escala = s;
+  rec.ox = Math.round((W - cw) / 2);
+  rec.oy = Math.round((H - ch) / 2);
   const dpr = devicePixelRatio || 1;
   const c = $('#rec-canvas');
   c.width = Math.round(cw * dpr);
@@ -502,49 +526,80 @@ function pintarRecorte() {
   const ctx = c.getContext('2d');
   ctx.imageSmoothingQuality = 'high';
   ctx.drawImage(o, 0, 0, c.width, c.height);
-  const svg = $('#rec-svg');
-  svg.setAttribute('viewBox', `0 0 ${o.width} ${o.height}`);
-  svg.style.width = `${cw}px`;
-  svg.style.height = `${ch}px`;
+  const capa = $('#rec-capa');
+  capa.width = Math.round(W * dpr);
+  capa.height = Math.round(H * dpr);
   pintarQuad();
 }
 
+const aPantalla = (q) => ({ x: rec.ox + q.x * rec.escala, y: rec.oy + q.y * rec.escala });
+
 function pintarQuad() {
-  const { puntos: p, pag, escala } = rec;
-  const { width: w, height: h } = pag.original;
-  const u = 1 / escala; // 1 px de pantalla en unidades de imagen
-  const poly = p.map((q) => `${q.x},${q.y}`).join(' ');
-  $('#rec-svg').innerHTML = `
-    <path d="M0 0H${w}V${h}H0Z M${p.map((q) => `${q.x} ${q.y}`).join(' L')}Z" fill="rgba(0,0,0,.55)" fill-rule="evenodd"/>
-    <polygon points="${poly}" fill="rgba(200,255,46,.08)" stroke="#c8ff2e" stroke-width="${2.5 * u}" stroke-linejoin="round"/>
-    ${p.map((q, i) => `
-      <circle cx="${q.x}" cy="${q.y}" r="${22 * u}" fill="rgba(200,255,46,.18)" data-i="${i}"/>
-      <circle cx="${q.x}" cy="${q.y}" r="${9 * u}" fill="#0b0d10" stroke="#c8ff2e" stroke-width="${3 * u}" pointer-events="none"/>`).join('')}`;
+  const capa = $('#rec-capa');
+  const ctx = capa.getContext('2d');
+  const dpr = devicePixelRatio || 1;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, capa.width, capa.height);
+  const { width: w, height: h } = rec.pag.original;
+  const p = rec.puntos.map(aPantalla);
+  const esq = aPantalla({ x: 0, y: 0 });
+  const fin = aPantalla({ x: w, y: h });
+  // Oscurece lo que queda fuera del recorte.
+  ctx.beginPath();
+  ctx.rect(esq.x, esq.y, fin.x - esq.x, fin.y - esq.y);
+  p.forEach((q, i) => (i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y)));
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(0,0,0,0.55)';
+  ctx.fill('evenodd');
+  // Contorno.
+  ctx.beginPath();
+  p.forEach((q, i) => (i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y)));
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(200,255,46,0.08)';
+  ctx.fill();
+  ctx.lineWidth = 2.5;
+  ctx.lineJoin = 'round';
+  ctx.strokeStyle = '#c8ff2e';
+  ctx.stroke();
+  // Esquinas.
+  for (const q of p) {
+    ctx.beginPath();
+    ctx.arc(q.x, q.y, 22, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(200,255,46,0.2)';
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(q.x, q.y, 10, 0, Math.PI * 2);
+    ctx.fillStyle = '#0b0d10';
+    ctx.fill();
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = '#c8ff2e';
+    ctx.stroke();
+  }
 }
 
 (() => {
-  const svg = $('#rec-svg');
+  const capa = $('#rec-capa');
   let arrastre = null;
   const aImagen = (e) => {
-    const r = svg.getBoundingClientRect();
-    return { x: (e.clientX - r.left) / rec.escala, y: (e.clientY - r.top) / rec.escala };
+    const r = capa.getBoundingClientRect();
+    return { x: (e.clientX - r.left - rec.ox) / rec.escala, y: (e.clientY - r.top - rec.oy) / rec.escala };
   };
-  svg.addEventListener('pointerdown', (e) => {
+  capa.addEventListener('pointerdown', (e) => {
     if (!rec) return;
     const pt = aImagen(e);
     let mejor = -1;
-    let dmin = 48 / rec.escala;
+    let dmin = 50 / rec.escala;
     rec.puntos.forEach((q, i) => {
       const d = Math.hypot(q.x - pt.x, q.y - pt.y);
       if (d < dmin) { dmin = d; mejor = i; }
     });
     if (mejor < 0) return;
     arrastre = { i: mejor, dx: rec.puntos[mejor].x - pt.x, dy: rec.puntos[mejor].y - pt.y };
-    svg.setPointerCapture(e.pointerId);
+    capa.setPointerCapture(e.pointerId);
     e.preventDefault();
     lupa(rec.puntos[mejor], e);
   });
-  svg.addEventListener('pointermove', (e) => {
+  capa.addEventListener('pointermove', (e) => {
     if (!arrastre) return;
     const pt = aImagen(e);
     const { width: w, height: h } = rec.pag.original;
@@ -555,8 +610,8 @@ function pintarQuad() {
     lupa(q, e);
   });
   const fin = () => { arrastre = null; $('#rec-lupa').hidden = true; };
-  svg.addEventListener('pointerup', fin);
-  svg.addEventListener('pointercancel', fin);
+  capa.addEventListener('pointerup', fin);
+  capa.addEventListener('pointercancel', fin);
 })();
 
 function lupa(punto, e) {
@@ -564,7 +619,8 @@ function lupa(punto, e) {
   l.hidden = false;
   const ctx = l.getContext('2d');
   const zoom = 3;
-  const lado = l.width / (rec.escala * zoom * (devicePixelRatio || 1)) * (devicePixelRatio || 1);
+  // Lado de la zona ampliada, en píxeles de la foto: lo que mide la lupa en pantalla / (escala * zoom).
+  const lado = (l.clientWidth || 110) / (rec.escala * zoom);
   ctx.fillStyle = '#000';
   ctx.fillRect(0, 0, l.width, l.height);
   ctx.drawImage(rec.pag.original, punto.x - lado / 2, punto.y - lado / 2, lado, lado, 0, 0, l.width, l.height);
@@ -1189,4 +1245,4 @@ async function iniciar() {
 iniciar();
 
 // Acceso para pruebas automáticas.
-window.__cz = { estado, abrirCamara, abrirRevisar, nuevaFoto, sincronizarYA, get detector() { return detector; }, reducir };
+window.__cz = { estado, abrirCamara, abrirRevisar, nuevaFoto, sincronizarYA, get detector() { return detector; }, get rec() { return rec; }, reducir };

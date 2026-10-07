@@ -325,8 +325,8 @@ button:disabled { opacity: 0.4; cursor: default; }
   overflow: hidden;
   touch-action: none;
 }
-#rec-canvas, #rec-svg { grid-area: 1 / 1; border-radius: 4px; }
-#rec-svg { overflow: visible; touch-action: none; }
+#rec-canvas { border-radius: 4px; }
+#rec-capa { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; }
 .lupa {
   position: absolute; top: 16px;
   width: 110px; height: 110px;

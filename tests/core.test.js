@@ -10,7 +10,7 @@ import { crearPdf } from '../js/pdf.js';
 import {
   homografia, aplicarH, enderezar, ordenarEsquinas, tamanoSalida, rotar, filtrar,
 } from '../js/image.js';
-import { fotoSintetica, HOJA } from './sintetica.js';
+import { fotoSintetica, HOJA, escenaPoste } from './sintetica.js';
 
 const require = createRequire(import.meta.url);
 
@@ -152,4 +152,13 @@ test('encoger mete las esquinas hacia dentro', async () => {
   const { encoger } = await import('../js/image.js');
   const q = encoger([{ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 100, y: 200 }, { x: 0, y: 200 }], 0.01);
   assert.deepEqual(q.map((p) => [Math.round(p.x), Math.round(p.y)]), [[1, 2], [99, 2], [99, 198], [1, 198]]);
+});
+
+test('sin documento (poste de noche) no inventa un recuadro', async () => {
+  let cv = require('../vendor/opencv.js');
+  if (cv instanceof Promise) cv = await cv;
+  else if (!cv.Mat) await new Promise((r) => { cv.onRuntimeInitialized = r; });
+  const { detectarDocumento } = require('../js/detector.js');
+  const res = detectarDocumento(cv, escenaPoste());
+  assert.ok(!res || res.cobertura < 0.12, `detectó ${JSON.stringify(res)}`);
 });
