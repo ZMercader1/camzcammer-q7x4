@@ -4,7 +4,7 @@ import { icon } from './icons.js';
 import { ajustes, guardarAjustes, DESTINOS } from './settings.js';
 import { sincronizar, pdfDe, necesitaSubida } from './sync.js';
 import {
-  Camara, Detector, cargarArchivo, nuevaPagina, renderizar, miniatura, marcoCompleto, reducir, imagenOcr,
+  Camara, Detector, cargarArchivo, nuevaPagina, renderizar, miniatura, marcoCompleto, reducir, imagenOcr, claveFiltro,
 } from './scan.js';
 import { FILTROS, ordenarEsquinas } from './image.js';
 import { crearPdf } from './pdf.js';
@@ -678,14 +678,18 @@ window.addEventListener('resize', () => { if (estado.vista === 'recorte') pintar
 // ================================================================= revisar y guardar
 
 let colaRender = Promise.resolve();
+const claveDe = (b) => claveFiltro(b.filtro, b.intensidad ?? 1);
+const alDia = (p, b) => p.salida && p.salida.clave === claveDe(b) && !p.sucia;
+
 function asegurarRender(p) {
-  const filtro = estado.borrador.filtro;
-  if (p.salida && p.salida.filtro === filtro && !p.sucia) return Promise.resolve(p.salida);
+  const b = estado.borrador;
+  if (alDia(p, b)) return Promise.resolve(p.salida);
   const tarea = colaRender.then(async () => {
-    if (p.salida && p.salida.filtro === filtro && !p.sucia) return p.salida;
+    // Puede haber cambiado el filtro mientras esperaba en la cola: se usa el actual.
+    if (alDia(p, b)) return p.salida;
     p.sucia = false;
     await sleep(16); // deja pintar el spinner antes del cálculo
-    return renderizar(p, estado.borrador.filtro);
+    return renderizar(p, b.filtro, b.intensidad ?? 1);
   });
   colaRender = tarea.catch(() => {});
   return tarea;
@@ -707,7 +711,9 @@ function abrirRevisar() {
     pintarSugeridos();
     pintarTipos();
   }
-  segmentos($('#rev-filtros'), FILTROS, b.filtro, (v) => { b.filtro = v; pintarPaginas(); });
+  if (b.intensidad == null) b.intensidad = ajustes().intensidad;
+  segmentos($('#rev-filtros'), FILTROS, b.filtro, (v) => { b.filtro = v; pintarIntensidad(); pintarPaginas(); });
+  pintarIntensidad();
   segmentos($('#f-destino'), DESTINOS, b.destino, (v) => { b.destino = v; pintarRuta(); });
   pintarPaginas();
   pintarRuta();
@@ -797,12 +803,31 @@ $('#f-tipos').addEventListener('click', (e) => {
   pintarRuta();
 });
 
+function pintarIntensidad() {
+  const b = estado.borrador;
+  $('#rev-intensidad').hidden = b.filtro === 'original';
+  $('#f-intensidad').value = Math.round((b.intensidad ?? 1) * 100);
+}
+
+// Se recalcula al soltar el dedo (o tras una pausa), no en cada píxel del deslizador.
+let intensidadT = 0;
+$('#f-intensidad').addEventListener('input', (e) => {
+  const b = estado.borrador;
+  if (!b) return;
+  clearTimeout(intensidadT);
+  intensidadT = setTimeout(() => {
+    b.intensidad = +e.target.value / 100;
+    guardarAjustes({ intensidad: b.intensidad });
+    pintarPaginas();
+  }, 250);
+});
+
 function pintarPaginas() {
   const b = estado.borrador;
   const n = b.paginas.length;
   $('#rev-paginas').innerHTML = b.paginas.map((p, i) => `
     <div class="pagina" data-i="${i}">
-      <div class="pagina-img">${p.salida && p.salida.filtro === b.filtro && !p.sucia
+      <div class="pagina-img">${alDia(p, b)
         ? `<img src="${p.salida.url}" alt="Página ${i + 1}">` : '<div class="spinner"></div>'}</div>
       <div class="pagina-barra">
         <span class="pagina-num">${i + 1}/${n}</span>
@@ -819,7 +844,7 @@ function pintarPaginas() {
       if (estado.borrador !== b) return;
       const i = b.paginas.indexOf(p);
       const cont = $(`#rev-paginas .pagina[data-i="${i}"] .pagina-img`);
-      if (cont && s.filtro === b.filtro) cont.innerHTML = `<img src="${s.url}" alt="Página ${i + 1}">`;
+      if (cont && s.clave === claveDe(b)) cont.innerHTML = `<img src="${s.url}" alt="Página ${i + 1}">`;
     }, (e) => toast(`Error al procesar: ${e.message}`, 'error'));
   });
 }

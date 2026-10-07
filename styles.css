@@ -453,6 +453,12 @@ button:disabled { opacity: 0.4; cursor: default; }
 .seg .ico { width: 17px; height: 17px; }
 .seg.on { background: var(--surface-3); color: var(--text); box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06) inset; }
 .filtros { margin: 0 16px; }
+.intensidad {
+  display: flex; align-items: center; gap: 12px;
+  margin: 12px 16px 0;
+  font-size: 12px; font-weight: 600; color: var(--muted);
+}
+.intensidad input { flex: 1; accent-color: var(--accent); height: 28px; }
 .hoja .filtros { margin: 0; }
 .filtros .seg { white-space: nowrap; padding: 6px 4px; }
 .filtros .seg.on { background: var(--accent); color: var(--accent-ink); }

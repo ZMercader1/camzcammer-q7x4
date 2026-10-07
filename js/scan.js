@@ -167,17 +167,19 @@ export function nuevaPagina(original, quad) {
   return { original, quad, rotacion: 0 };
 }
 
+export const claveFiltro = (filtro, intensidad) => (filtro === 'original' ? filtro : `${filtro}:${intensidad}`);
+
 /** Endereza (con caché), gira y filtra. Devuelve la página final en JPEG. */
-export async function renderizar(p, filtro) {
+export async function renderizar(p, filtro, intensidad = 1) {
   if (!p.enderezada) {
     const quad = encoger(p.quad, 0.012);
     p.enderezada = enderezar(imageData(p.original), quad, tamanoSalida(quad, MAX_PAGINA));
   }
-  const img = filtrar(rotar(p.enderezada, p.rotacion), filtro);
+  const img = filtrar(rotar(p.enderezada, p.rotacion), filtro, intensidad);
   const c = aCanvas(img);
   const blob = await aBlob(c, filtro === 'documento' ? 0.8 : 0.85);
   if (p.salida?.url) URL.revokeObjectURL(p.salida.url);
-  p.salida = { blob, width: c.width, height: c.height, url: URL.createObjectURL(blob), filtro };
+  p.salida = { blob, width: c.width, height: c.height, url: URL.createObjectURL(blob), filtro, clave: claveFiltro(filtro, intensidad) };
   return p.salida;
 }
 

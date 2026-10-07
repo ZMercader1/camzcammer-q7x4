@@ -5,6 +5,7 @@ const DEFECTO = {
   carpeta: '/FACTURAS',
   destino: 'ambos', // 'ambos' | 'dropbox' | 'movil'
   filtro: 'documento',
+  intensidad: 0.8, // 0 = suave, 1 = intenso
   empezarEnCamara: true,
   confirmarRecorte: true,
   camaraNativa: false, // abrir la cámara del iPhone (12 MP, flash real) en vez de la de la web

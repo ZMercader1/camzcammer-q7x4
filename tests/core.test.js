@@ -167,3 +167,14 @@ test('poste de noche: no inventa un recuadro', async () => {
     q.forEach((p, i) => assert.ok(Math.hypot(p.x - cartel[i].x, p.y - cartel[i].y) < 15, `detectó ${JSON.stringify(res.puntos)}`));
   }
 });
+
+test('intensidad: 1 es el filtro de siempre, 0 lo suaviza', () => {
+  const foto = fotoSintetica();
+  const hoja = enderezar(foto, HOJA, tamanoSalida(HOJA));
+  const fuerte = filtrar(hoja, 'documento');
+  assert.deepEqual(filtrar(hoja, 'documento', 1).data, fuerte.data);
+  const grises = (img) => { let n = 0; for (let i = 0; i < img.data.length; i += 4) if (img.data[i] > 60 && img.data[i] < 230) n++; return n; };
+  // Suave = más tonos intermedios (menos "quemado") que el B/N puro.
+  assert.ok(grises(filtrar(hoja, 'documento', 0.3)) > grises(fuerte));
+  assert.equal(filtrar(hoja, 'color', 0).data[0], hoja.data[0]);
+});

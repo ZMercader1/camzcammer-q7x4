@@ -252,11 +252,45 @@ function normalizar(g, w, h) {
   return out;
 }
 
-/** Aplica un filtro y devuelve una imagen nueva. */
-export function filtrar(img, filtro) {
+/** Mezcla `base` hacia `top` en proporción k (0 = base, 1 = top), sobre `top`. */
+function mezclar(base, top, k) {
+  if (k >= 1) return top;
+  const b = base.data;
+  const t = top.data;
+  for (let i = 0; i < t.length; i += 4) {
+    t[i] = b[i] + (t[i] - b[i]) * k;
+    t[i + 1] = b[i + 1] + (t[i + 1] - b[i + 1]) * k;
+    t[i + 2] = b[i + 2] + (t[i + 2] - b[i + 2]) * k;
+  }
+  return top;
+}
+
+/**
+ * Aplica un filtro y devuelve una imagen nueva. `intensidad` (0..1) suaviza el efecto:
+ *   documento: de gris realzado (0) a blanco y negro puro (1)
+ *   gris:      de gris sin tocar (0) a gris realzado (1)
+ *   color:     de la foto (0) a color realzado (1)
+ */
+export function filtrar(img, filtro, intensidad = 1) {
+  const k = Math.max(0, Math.min(1, intensidad));
+  if (filtro === 'original') return img;
+  if (filtro === 'color') return mezclar(img, filtrarPuro(img, 'color'), k);
+  if (filtro === 'gris') {
+    const base = nuevo(img.width, img.height);
+    const g = luminancia(img);
+    for (let i = 0, j = 0; i < g.length; i++, j += 4) {
+      base.data[j] = base.data[j + 1] = base.data[j + 2] = g[i];
+      base.data[j + 3] = 255;
+    }
+    return mezclar(base, filtrarPuro(img, 'gris'), k);
+  }
+  if (k >= 1) return filtrarPuro(img, 'documento');
+  return mezclar(filtrarPuro(img, 'gris'), filtrarPuro(img, 'documento'), k);
+}
+
+function filtrarPuro(img, filtro) {
   const { width: w, height: h } = img;
   const n = w * h;
-  if (filtro === 'original') return img;
   const out = nuevo(w, h);
   const d = out.data;
 
