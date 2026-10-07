@@ -396,7 +396,7 @@ let fallos = 0;
 function estabilizar(r, video) {
   const tol = 0.05 * Math.max(video.videoWidth, video.videoHeight);
   const cerca = (a, b) => a.every((p, i) => Math.hypot(p.x - b[i].x, p.y - b[i].y) < tol);
-  if (r && r.cobertura > 0.12) {
+  if (r && r.cobertura > 0.02) {
     if (candidato && cerca(r.puntos, candidato)) quadObjetivo = r.puntos;
     else if (quadObjetivo && !cerca(r.puntos, quadObjetivo)) fallos++;
     candidato = r.puntos;
@@ -410,7 +410,7 @@ function estabilizar(r, video) {
 
 /** Con el disparo automático activo, dispara cuando las esquinas no se mueven durante un rato. */
 function vigilarQuietud(r, video) {
-  if (!ajustes().autoDisparo || capturando || !r || r.cobertura < 0.2) { quieto.ref = null; return; }
+  if (!ajustes().autoDisparo || capturando || !r || r.cobertura < 0.05) { quieto.ref = null; return; }
   const tol = 0.02 * Math.max(video.videoWidth, video.videoHeight);
   const igual = quieto.ref && r.puntos.every((p, i) => Math.hypot(p.x - quieto.ref[i].x, p.y - quieto.ref[i].y) < tol);
   if (!igual) { quieto = { desde: Date.now(), ref: r.puntos }; return; }
@@ -424,7 +424,7 @@ async function detectarEn(c) {
   if (!detector?.listo) return null;
   try {
     const r = await detector.detectar(c, c.width, c.height);
-    return r && r.cobertura > 0.12 ? r.puntos : null;
+    return r && r.cobertura > 0.02 ? r.puntos : null;
   } catch {
     return null;
   }

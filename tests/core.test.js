@@ -154,11 +154,16 @@ test('encoger mete las esquinas hacia dentro', async () => {
   assert.deepEqual(q.map((p) => [Math.round(p.x), Math.round(p.y)]), [[1, 2], [99, 2], [99, 198], [1, 198]]);
 });
 
-test('sin documento (poste de noche) no inventa un recuadro', async () => {
+test('poste de noche: no inventa un recuadro', async () => {
   let cv = require('../vendor/opencv.js');
   if (cv instanceof Promise) cv = await cv;
   else if (!cv.Mat) await new Promise((r) => { cv.onRuntimeInitialized = r; });
   const { detectarDocumento } = require('../js/detector.js');
   const res = detectarDocumento(cv, escenaPoste());
-  assert.ok(!res || res.cobertura < 0.12, `detectó ${JSON.stringify(res)}`);
+  // Puede encontrar el cartel pequeño (es un papel), pero nunca un recuadro inventado.
+  if (res) {
+    const q = ordenarEsquinas(res.puntos);
+    const cartel = [{ x: 200, y: 420 }, { x: 280, y: 420 }, { x: 280, y: 540 }, { x: 200, y: 540 }];
+    q.forEach((p, i) => assert.ok(Math.hypot(p.x - cartel[i].x, p.y - cartel[i].y) < 15, `detectó ${JSON.stringify(res.puntos)}`));
+  }
 });

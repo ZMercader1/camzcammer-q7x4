@@ -2,4 +2,4 @@
 // También se puede poner desde Ajustes → Avanzado.
 export const DROPBOX_APP_KEY = '';
 
-export const VERSION = '1.2.1';
+export const VERSION = '1.3.0';
