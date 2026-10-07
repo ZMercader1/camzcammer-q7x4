@@ -1006,15 +1006,7 @@ $('#det-acciones').addEventListener('click', async (e) => {
       break;
     }
     case 'abrir': {
-      // Se abre la ventana antes del await para que Safari no la bloquee.
-      const w = window.open('', '_blank');
-      try {
-        const link = await dbx.enlaceTemporal(f.rutaDropbox);
-        if (w) w.location = link; else location.href = link;
-      } catch (err) {
-        w?.close();
-        toast(err.message, 'error');
-      }
+      window.open(dbx.enlaceWeb(f.rutaDropbox), '_blank');
       break;
     }
     case 'reintentar':

@@ -32,6 +32,8 @@ export async function iniciarConexion() {
     code_challenge: challenge,
     code_challenge_method: 'S256',
     token_access_type: 'offline',
+    // Solo escribir: la app no puede leer ni descargar nada de tu Dropbox.
+    scope: 'files.content.write account_info.read',
     redirect_uri: redirectUri(),
   });
   location.href = url.href;
@@ -156,8 +158,10 @@ export async function mover(desde, hasta) {
   return r.metadata.path_display;
 }
 
-export async function enlaceTemporal(ruta) {
-  return (await rpc('files/get_temporary_link', { path: ruta })).link;
+/** Enlace a la web de Dropbox con el archivo abierto. No usa la API (no hace falta permiso de lectura). */
+export function enlaceWeb(ruta) {
+  const i = ruta.lastIndexOf('/');
+  return `https://www.dropbox.com/home${encodeURI(ruta.slice(0, i))}?preview=${encodeURIComponent(ruta.slice(i + 1))}`;
 }
 
 export async function desconectar() {

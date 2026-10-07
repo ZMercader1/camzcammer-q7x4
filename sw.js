@@ -1,6 +1,6 @@
 // Service worker: la app funciona sin conexión (en el coche, en un parking...).
 // Al cambiar cualquier archivo, sube VERSION para que los móviles se actualicen.
-const VERSION = 'cz-1.2.0';
+const VERSION = 'cz-1.2.1';
 // Las librerías pesadas (OpenCV, Tesseract) van en su propia caché y no se vuelven a
 // descargar con cada versión de la app.
 const VENDOR = 'cz-vendor-1';
