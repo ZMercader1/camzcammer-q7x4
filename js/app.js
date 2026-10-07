@@ -255,11 +255,19 @@ let bucle = 0;
 let quadObjetivo = null;
 let quadVisible = null;
 let capturando = false;
+let quieto = { desde: 0, ref: null };
+const QUIETO_MS = 1200;
 
 async function abrirCamara() {
   if (!estado.borrador) estado.borrador = { paginas: [], filtro: ajustes().filtro };
+  if (ajustes().camaraNativa) {
+    // La cámara del iPhone: máxima resolución y su propio flash. Luego sigue el mismo flujo.
+    elegirArchivo(true);
+    return;
+  }
   mostrar('camara');
   pintarCamUI();
+  pintarAuto();
   avisoCam(null);
   $('#cam-estado').textContent = 'Abriendo cámara…';
   $('#cam-estado').classList.remove('ok');
@@ -273,7 +281,6 @@ async function abrirCamara() {
     return;
   }
   if (estado.vista !== 'camara') return;
-  $('#cam-flash').hidden = !camara.tieneLinterna;
   pintarFlash();
   arrancarBucle();
 }
@@ -308,6 +315,10 @@ function pintarCamUI() {
   if (ultima?.salida) $('#cam-mini').src = ultima.salida.url;
 }
 
+function pintarAuto() {
+  $('#cam-auto').classList.toggle('on', ajustes().autoDisparo);
+}
+
 function pintarFlash() {
   $('#cam-flash').innerHTML = icon(camara.linterna ? 'flash' : 'flashOff');
   $('#cam-flash').classList.toggle('on', camara.linterna);
@@ -324,6 +335,7 @@ function arrancarBucle() {
           const r = await detector.detectar(video, video.videoWidth, video.videoHeight, 360);
           if (id !== bucle) return;
           quadObjetivo = r && r.cobertura > 0.08 ? r.puntos : null;
+          vigilarQuietud(r, video);
         } catch { /* siguiente vuelta */ }
       }
       await sleep(90);
@@ -344,7 +356,8 @@ function arrancarBucle() {
     const vh = video.videoHeight;
     const est = $('#cam-estado');
     if (!detector?.listo) est.textContent = detector?.fallo ? 'Sin detección automática' : 'Preparando detector…';
-    else est.textContent = quadObjetivo ? 'Documento detectado' : 'Encuadra la factura';
+    else if (!quadObjetivo) est.textContent = 'Encuadra la factura';
+    else est.textContent = ajustes().autoDisparo && quieto.ref ? 'Quieto… disparando' : 'Documento detectado';
     est.classList.toggle('ok', !!quadObjetivo);
     if (vw && quadObjetivo) {
       const s = Math.max(cw / vw, ch / vh);
@@ -372,6 +385,18 @@ function arrancarBucle() {
     requestAnimationFrame(frame);
   };
   requestAnimationFrame(frame);
+}
+
+/** Con el disparo automático activo, dispara cuando las esquinas no se mueven durante un rato. */
+function vigilarQuietud(r, video) {
+  if (!ajustes().autoDisparo || capturando || !r || r.cobertura < 0.2) { quieto.ref = null; return; }
+  const tol = 0.02 * Math.max(video.videoWidth, video.videoHeight);
+  const igual = quieto.ref && r.puntos.every((p, i) => Math.hypot(p.x - quieto.ref[i].x, p.y - quieto.ref[i].y) < tol);
+  if (!igual) { quieto = { desde: Date.now(), ref: r.puntos }; return; }
+  if (Date.now() - quieto.desde >= QUIETO_MS) {
+    quieto.ref = null;
+    disparar();
+  }
 }
 
 async function detectarEn(c) {
@@ -559,7 +584,10 @@ function lupa(punto, e) {
 $('#rec-cancelar').addEventListener('click', () => {
   const nueva = rec?.nueva;
   rec = null;
-  if (nueva) abrirCamara(); else abrirRevisar();
+  if (!nueva) { abrirRevisar(); return; }
+  // Con la cámara del iPhone, si se cancela el selector hay que quedar en una pantalla válida.
+  if (estado.borrador?.paginas.length) abrirRevisar(); else mostrar('lista');
+  abrirCamara();
 });
 $('#rec-auto').addEventListener('click', () => {
   const { width: w, height: h } = rec.pag.original;
@@ -1014,6 +1042,8 @@ async function abrirAjustes() {
       <div class="campo"><span>Guardar en</span><div class="segmentos destino" id="aj-destino"></div></div>
       <div class="campo"><span>Filtro</span><div class="segmentos filtros" id="aj-filtro"></div></div>
       <label class="interruptor"><span>Abrir directamente la cámara</span><input type="checkbox" id="aj-camara" ${a.empezarEnCamara ? 'checked' : ''}><i></i></label>
+      <label class="interruptor"><span>Usar la cámara del iPhone<small>Máxima resolución y flash real</small></span><input type="checkbox" id="aj-nativa" ${a.camaraNativa ? 'checked' : ''}><i></i></label>
+      <label class="interruptor"><span>Disparo automático<small>Hace la foto cuando la factura está quieta</small></span><input type="checkbox" id="aj-auto" ${a.autoDisparo ? 'checked' : ''}><i></i></label>
       <label class="interruptor"><span>Revisar siempre el recorte</span><input type="checkbox" id="aj-recorte" ${a.confirmarRecorte ? 'checked' : ''}><i></i></label>
     </div>
 
@@ -1035,6 +1065,8 @@ async function abrirAjustes() {
     segmentos(h.querySelector('#aj-destino'), DESTINOS, a.destino, (v) => guardarAjustes({ destino: v }));
     segmentos(h.querySelector('#aj-filtro'), FILTROS, a.filtro, (v) => guardarAjustes({ filtro: v }));
     h.querySelector('#aj-camara').onchange = (e) => guardarAjustes({ empezarEnCamara: e.target.checked });
+    h.querySelector('#aj-nativa').onchange = (e) => guardarAjustes({ camaraNativa: e.target.checked });
+    h.querySelector('#aj-auto').onchange = (e) => guardarAjustes({ autoDisparo: e.target.checked });
     h.querySelector('#aj-recorte').onchange = (e) => guardarAjustes({ confirmarRecorte: e.target.checked });
     h.querySelector('#aj-carpeta').onchange = (e) => {
       const v = e.target.value.trim() || '/FACTURAS';
@@ -1107,9 +1139,16 @@ function eventosFijos() {
     mostrar('lista');
   };
   $('#cam-flash').onclick = async () => {
-    const ok = await camara.setLinterna(!camara.linterna);
-    if (!ok) toast('El flash no está disponible aquí', 'error');
-    pintarFlash();
+    if (camara.tieneLinterna && await camara.setLinterna(!camara.linterna)) { pintarFlash(); return; }
+    // Safari no deja encender la linterna desde la web: la cámara del iPhone sí tiene flash.
+    toast('Abriendo la cámara del iPhone, que tiene flash');
+    elegirArchivo(true);
+  };
+  $('#cam-auto').onclick = () => {
+    const on = !ajustes().autoDisparo;
+    guardarAjustes({ autoDisparo: on });
+    pintarAuto();
+    toast(on ? 'Disparo automático: mantén la factura quieta' : 'Disparo automático desactivado');
   };
   $('#cam-galeria').onclick = () => elegirArchivo(false);
   $('#cam-disparar').onclick = disparar;
@@ -1141,7 +1180,7 @@ async function iniciar() {
   if (retorno?.ok) toast('Dropbox conectado');
   else if (retorno?.codigo) mostrarCodigo(retorno.codigo);
   else if (retorno?.error) toast(`Dropbox: ${retorno.error}`, 'error');
-  else if (ajustes().empezarEnCamara) abrirCamara();
+  else if (ajustes().empezarEnCamara && !ajustes().camaraNativa) abrirCamara();
 
   if (dbx.conectado() && !dbx.cuentaGuardada()) dbx.cuenta().catch(() => {});
   sincronizarYA();

@@ -7,6 +7,8 @@ const DEFECTO = {
   filtro: 'documento',
   empezarEnCamara: true,
   confirmarRecorte: true,
+  camaraNativa: false, // abrir la cámara del iPhone (12 MP, flash real) en vez de la de la web
+  autoDisparo: false, // hacer la foto sola cuando la factura está quieta
 };
 
 export function ajustes() {

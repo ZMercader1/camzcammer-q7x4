@@ -50,11 +50,15 @@ button:disabled { opacity: 0.4; cursor: default; }
   flex-direction: column;
   background: var(--bg);
   opacity: 0;
+  visibility: hidden;
   pointer-events: none;
   transform: translateY(8px);
+}
+/* Solo la vista que entra se anima; la que sale desaparece al instante (sin superponerse). */
+.vista.activa {
+  opacity: 1; visibility: visible; pointer-events: auto; transform: none;
   transition: opacity 0.18s ease, transform 0.18s ease;
 }
-.vista.activa { opacity: 1; pointer-events: auto; transform: none; }
 .vista.oscura { background: #000; }
 
 .barra {
@@ -238,6 +242,17 @@ button:disabled { opacity: 0.4; cursor: default; }
   transition: color 0.2s, background 0.2s;
 }
 .cam-estado.ok { color: var(--accent-ink); background: var(--accent); }
+.cam-der { display: flex; align-items: center; gap: 8px; }
+.chip-auto {
+  height: 32px; padding: 0 10px;
+  border-radius: 999px;
+  font-size: 12px; font-weight: 800; letter-spacing: 0.06em;
+  color: #dfe3e8;
+  background: rgba(20, 22, 26, 0.55);
+  -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+.chip-auto.on { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
 .btn-cristal {
   width: 44px; height: 44px;
   display: grid; place-items: center;
@@ -569,6 +584,8 @@ details.mini[open] { display: grid; gap: 12px; }
 }
 
 .interruptor { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; }
+.interruptor > span { display: grid; gap: 2px; }
+.interruptor small { color: var(--muted); font-size: 12px; }
 .interruptor input { position: absolute; opacity: 0; pointer-events: none; }
 .interruptor i {
   position: relative; flex: none;
@@ -588,6 +605,7 @@ details.mini[open] { display: grid; gap: 12px; }
 .toast {
   position: fixed; left: 50%; top: calc(var(--top) + 12px); z-index: 40;
   display: flex; align-items: center; gap: 8px;
+  width: max-content;
   max-width: calc(100% - 32px);
   padding: 11px 16px;
   border-radius: 14px;

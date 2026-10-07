@@ -1,6 +1,6 @@
 // Service worker: la app funciona sin conexión (en el coche, en un parking...).
 // Al cambiar cualquier archivo, sube VERSION para que los móviles se actualicen.
-const VERSION = 'cz-1.0.0';
+const VERSION = 'cz-1.1.0';
 const APP = [
   './',
   'index.html',
