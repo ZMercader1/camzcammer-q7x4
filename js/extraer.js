@@ -12,10 +12,11 @@ const palabra = (term, linea) => new RegExp(`(^|[^A-Z0-9])${term.replace(/[.*+?^
 // ---------------------------------------------------------------- importe
 
 const RE_NUM = /(?<![\d.,])(\d{1,3}(?:[.\s]\d{3})*[,.]\d{2}|\d+[,.]\d{2})(?![\d])/g;
-const FUERTES = ['TOTAL A PAGAR', 'TOTAL FACTURA', 'IMPORTE TOTAL', 'TOTAL EUROS', 'TOTAL EUR', 'A PAGAR', 'TOTAL COMPRA', 'TOTAL TICKET'];
+const FUERTES = ['TOTAL SUMINISTRADO', 'TOTAL SUMINIST', 'TOTAL A PAGAR', 'TOTAL FACTURA', 'IMPORTE TOTAL', 'TOTAL EUROS', 'TOTAL EUR', 'A PAGAR', 'TOTAL COMPRA', 'TOTAL TICKET'];
 const SUAVES = ['TOTAL', 'IMPORTE'];
 const EXCLUIDAS = ['ENTREGADO', 'CAMBIO', 'EFECTIVO', 'DEVOLUCION', 'BASE', 'IVA', 'TARJETA', 'PROPINA', 'SUBTOTAL', 'CUOTA', 'DESCUENTO', 'PUNTOS', 'AHORRO'];
-const DURAS = ['BASE IMPONIBLE', 'SUBTOTAL', 'TOTAL BASE', 'TOTAL IVA', 'CUOTA IVA', 'TOTAL PUNTOS', 'TOTAL AHORRO', 'TOTAL DESCUENTO'];
+// "Total reservado" es la preautorización que bloquea un surtidor, no lo que se paga.
+const DURAS = ['RESERVADO', 'PREAUTORIZ', 'RETENIDO', 'BASE IMPONIBLE', 'SUBTOTAL', 'TOTAL BASE', 'TOTAL IVA', 'CUOTA IVA', 'TOTAL PUNTOS', 'TOTAL AHORRO', 'TOTAL DESCUENTO'];
 
 function numeros(linea) {
   const out = [];
@@ -102,13 +103,29 @@ export function extraerFecha(texto, hoy = new Date()) {
 export function extraerRef(texto) {
   for (const linea of String(texto || '').split(/\r?\n/)) {
     const n = norm(linea);
-    const m = /(?:FACTURA(?:\s+SIMPLIFICADA)?|FRA\.?|TICKET|N[º°O]\s*(?:DE\s*)?FACTURA)[^A-Z0-9]{0,6}(?:N[º°O*.]*|NUM(?:ERO)?\.?)?\s*[:#]?\s*([A-Z]{0,4}[\d][A-Z0-9\-/]{3,20})/.exec(n);
+    const m = /(?:FACTURA(?:\s+SIMPLIFICADA)?|FRA\.?|TICKET|N[º°O]\s*(?:DE\s*)?FACTURA)[^A-Z0-9]{0,6}(?:N[º°O]?[^A-Z0-9\s]{0,2}|NUM(?:ERO)?\.?)?\s*[:#]?\s*([A-Z]{0,4}[\d][A-Z0-9\-/]{3,20})/.exec(n);
     if (m && /\d{3,}/.test(m[1])) return m[1].replace(/[-/]+$/, '');
   }
   return null;
 }
 
 // ---------------------------------------------------------------- tipo y proveedor
+
+/** ¿Difieren a lo sumo en una letra (cambiada, añadida o quitada)? Para el OCR ("DALLENOIL"). */
+function aUnaLetra(a, b) {
+  if (a === b) return true;
+  if (Math.abs(a.length - b.length) > 1) return false;
+  let i = 0;
+  while (i < a.length && i < b.length && a[i] === b[i]) i++;
+  if (a.length === b.length) return a.slice(i + 1) === b.slice(i + 1);
+  return a.length > b.length ? a.slice(i + 1) === b.slice(i) : a.slice(i) === b.slice(i + 1);
+}
+
+/** La marca aparece tal cual o, si es una palabra larga, con una letra mal leída. */
+function conMarca(marca, n, tokens) {
+  if (palabra(marca, n)) return true;
+  return marca.length >= 6 && !marca.includes(' ') && tokens.some((t) => t.length >= 5 && aUnaLetra(t, marca));
+}
 
 /** Tipos con el prefijo que se usa en el nombre del archivo (como "Gasolina Ballenoil"). */
 export const TIPOS = [
@@ -130,9 +147,10 @@ const titulo = (s) => s.toLowerCase().replace(/(^|[\s\-&])(\p{L})/gu, (_, a, b) 
 /** Detecta el tipo y, si aparece, la marca conocida. */
 export function detectarTipo(texto) {
   const n = norm(texto);
+  const tokens = n.split(/[^A-Z0-9]+/).filter(Boolean);
   let mejor = null;
   for (const t of TIPOS) {
-    const marca = t.marcas.find((m) => palabra(m, n));
+    const marca = t.marcas.find((m) => conMarca(m, n, tokens));
     const señales = t.señales.filter((s) => palabra(s.trim(), n)).length;
     const puntos = (marca ? 3 : 0) + señales;
     if (puntos > 0 && (!mejor || puntos > mejor.puntos)) mejor = { tipo: t.id, marca: marca ? titulo(marca) : null, puntos };
@@ -164,10 +182,11 @@ const PALABRAS_TIPO = new Set(TIPO_IDS.map(norm));
  */
 export function proveedorConocido(texto, anteriores) {
   const n = norm(texto);
+  const tokens = n.split(/[^A-Z0-9]+/).filter(Boolean);
   const votos = new Map();
   for (const nombre of anteriores) {
     const claves = norm(nombre).split(/[^A-Z0-9]+/).filter((w) => w.length >= 4 && !PALABRAS_TIPO.has(w) && !/^\d+$/.test(w));
-    if (claves.length && claves.some((w) => palabra(w, n))) votos.set(nombre, (votos.get(nombre) || 0) + 1);
+    if (claves.length && claves.some((w) => conMarca(w, n, tokens) || palabra(w, n))) votos.set(nombre, (votos.get(nombre) || 0) + 1);
   }
   return [...votos].sort((a, b) => b[1] - a[1])[0]?.[0] || null;
 }

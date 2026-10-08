@@ -6,4 +6,4 @@ export const DROPBOX_APP_KEY = 'ertqq5xooc1h8xn';
 // Dropbox/Aplicaciones/<nombre de la app>, así que aquí va "/". Con "Full Dropbox", "/FACTURAS".
 export const CARPETA_BASE = '/';
 
-export const VERSION = '1.5.1';
+export const VERSION = '1.5.2';

@@ -183,14 +183,18 @@ export async function renderizar(p, filtro, intensidad = 1) {
   return p.salida;
 }
 
-/** Página preparada para leer texto: gris limpio, margen blanco y tamaño moderado. */
+/**
+ * Página preparada para leer texto: blanco y negro nítido, margen blanco y ampliada. En un ticket
+ * largo y estrecho el texto queda diminuto y Tesseract confunde dígitos (un 6 por un 2...), así
+ * que se amplía hasta unos 5 megapíxeles.
+ */
 export function imagenOcr(p) {
   if (!p.enderezada) {
     const quad = encoger(p.quad, 0.012);
     p.enderezada = enderezar(imageData(p.original), quad, tamanoSalida(quad, MAX_PAGINA));
   }
-  const img = aCanvas(filtrar(rotar(p.enderezada, p.rotacion), 'gris'));
-  const s = Math.min(1, 1600 / img.width);
+  const img = aCanvas(filtrar(rotar(p.enderezada, p.rotacion), 'documento'));
+  const s = Math.min(2.5, 1500 / img.width, Math.sqrt(5e6 / (img.width * img.height)));
   const margen = 30;
   const c = canvas(Math.round(img.width * s) + margen * 2, Math.round(img.height * s) + margen * 2);
   const ctx = c.getContext('2d');

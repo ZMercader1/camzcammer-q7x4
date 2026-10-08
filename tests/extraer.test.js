@@ -107,3 +107,52 @@ TOTAL A PAGAR 54,07 €`;
   assert.equal(r.importe, 54.07);
   assert.equal(r.ref, '2026-004512');
 });
+
+test('ticket real de gasolinera: el total es lo suministrado, no la reserva', () => {
+  const ocr = `Ballenoil, S.A
+C/ Tres Rieres, s/n
+08292 Esparrayuera
+Fecha: 07/10/2026 20:70
+Turno: 4301
+Albarán + 2620122650
+Factura + 260702013172
+Producto ; Sin Plomo 95
+Litros +1 36,18
+Precio : 1,719
+Importe 1 62,19
+IVA 1 21,00%
+B.Imp. 1: 51,40
+Imp. IVA : 10,79
+Total reservado : 124,00 Eur
+Total suminist. : 62,19 Eur
+VISA CREDITO/DEB
+Fecha: 07.10.26 Hora: 20:20
+60,19 EUR`;
+  const r = analizar(ocr, { hoy: HOY });
+  assert.equal(r.importe, 62.19);
+  assert.equal(r.fecha, '2026-10-07');
+  assert.equal(r.ref, '260702013172');
+  assert.equal(r.proveedor, 'Gasolina Ballenoil');
+  // La reserva sola nunca se toma como total.
+  assert.equal(extraerImporte('Total reservado : 124,00 Eur'), null);
+});
+
+test('marca con una letra mal leída por el OCR', () => {
+  const r = analizar(`DALLENOIL - ARNES
+Ballenoil S A
+Fecha: 07/10/2026
+Total suminist. : 62,19 Eur`, { hoy: HOY });
+  assert.equal(r.proveedor, 'Gasolina Ballenoil');
+  assert.equal(detectarTipo('REPSOL estacion').marca, 'Repsol');
+  assert.equal(detectarTipo('REPSAL estacion').marca, 'Repsol');
+  // Palabras normales no se confunden con marcas.
+  assert.equal(detectarTipo('Ballena azul y bolleras'), null);
+  assert.equal(proveedorConocido('DALLENOIL', ['Gasolina Ballenoil']), 'Gasolina Ballenoil');
+});
+
+test('nº de factura cuando el OCR lee el símbolo º como una comilla', () => {
+  assert.equal(extraerRef('FACTURA SIMPLIFICADA N” 2026-004512'), '2026-004512');
+  assert.equal(extraerRef('FACTURA SIMPLIFICADA N* 2026-004512'), '2026-004512');
+  assert.equal(extraerRef('Factura Nº F260047'), 'F260047');
+  assert.equal(extraerRef('Factura + 260702013172'), '260702013172');
+});
