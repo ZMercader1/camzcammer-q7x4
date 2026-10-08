@@ -924,7 +924,8 @@ function pintarRuta() {
     html = `${icon('phone')}<div><small>Solo en este móvil</small><b>${esc(nombre)}</b></div>`;
   } else {
     const carpeta = ajustes().carpeta.replace(/^\/+|\/+$/g, '');
-    html = `${icon('cloud')}<div><small>${esc(carpeta)} › ${esc(carpetaTrimestre(y, m))} › ${MESES[m]} › Gastos</small><b>${esc(nombre)}</b>
+    const raiz = carpeta ? `${carpeta} › ` : '';
+    html = `${icon('cloud')}<div><small>${esc(raiz)}${esc(carpetaTrimestre(y, m))} › ${MESES[m]} › Gastos</small><b>${esc(nombre)}</b>
       ${dbx.conectado() ? '' : '<em>Dropbox no está conectado: se subirá cuando lo conectes.</em>'}</div>`;
   }
   $('#f-ruta').innerHTML = html;
@@ -1206,7 +1207,7 @@ async function abrirAjustes() {
           <div class="fila-codigo"><input id="aj-codigo" placeholder="Pega el código"><button type="button" class="btn-secundario" id="aj-usar">Usar</button></div>
         </details>`}
       <label class="campo"><span>Carpeta</span><input id="aj-carpeta" value="${esc(a.carpeta)}" autocapitalize="off" spellcheck="false"></label>
-      <p class="nota">Dentro: «Trimestre año / Mes / Gastos», como ya las tienes.</p>
+      <p class="nota">${a.carpeta === '/' ? 'Dentro de Dropbox › Aplicaciones › tu app.' : ''} Se guarda en «Trimestre año / Mes / Gastos».</p>
     </div>
 
     <div class="grupo">
@@ -1243,8 +1244,8 @@ async function abrirAjustes() {
     h.querySelector('#aj-auto').onchange = (e) => guardarAjustes({ autoDisparo: e.target.checked });
     h.querySelector('#aj-recorte').onchange = (e) => guardarAjustes({ confirmarRecorte: e.target.checked });
     h.querySelector('#aj-carpeta').onchange = (e) => {
-      const v = e.target.value.trim() || '/FACTURAS';
-      guardarAjustes({ carpeta: v.startsWith('/') ? v : `/${v}` });
+      const v = e.target.value.trim();
+      guardarAjustes({ carpeta: v.startsWith('/') ? v : `/${v}` }); // "/" = la raíz de la app
     };
     h.querySelector('#aj-appkey').onchange = (e) => { dbx.setAppKey(e.target.value); cerrarHoja(); abrirAjustes(); };
     h.querySelector('#aj-conectar')?.addEventListener('click', () => dbx.iniciarConexion().catch((e) => toast(e.message, 'error')));

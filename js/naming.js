@@ -86,8 +86,9 @@ export function nombreArchivo({ proveedor, fecha, ref, importe }) {
 /** Ruta completa en Dropbox para una factura. */
 export function rutaDropbox(base, factura, tipo = 'Gastos') {
   const { y, m } = partesFecha(factura.fecha);
-  let b = '/' + String(base || '/FACTURAS').trim().replace(/^\/+|\/+$/g, '');
-  if (b === '/') b = '';
+  // base "/" (o vacía a propósito) = la raíz: así se usa con una app de Dropbox de carpeta aislada.
+  const limpia = String(base ?? '/FACTURAS').trim().replace(/^\/+|\/+$/g, '');
+  const b = limpia ? `/${limpia}` : '';
   return `${b}/${carpetaTrimestre(y, m)}/${MESES[m]}/${tipo}/${nombreArchivo(factura)}`;
 }
 

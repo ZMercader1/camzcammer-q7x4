@@ -178,3 +178,10 @@ test('intensidad: 1 es el filtro de siempre, 0 lo suaviza', () => {
   assert.ok(grises(filtrar(hoja, 'documento', 0.3)) > grises(fuerte));
   assert.equal(filtrar(hoja, 'color', 0).data[0], hoja.data[0]);
 });
+
+test('carpeta aislada: base "/" cuelga todo de la raíz de la app', () => {
+  const f = { proveedor: 'Gasolina Ballenoil', fecha: '2026-10-08', importe: 54.07 };
+  assert.equal(rutaDropbox('/', f), '/Octubre Noviembre Diciembre 2026/Octubre/Gastos/Gasolina Ballenoil 2026-10-08 (54,07).pdf');
+  assert.equal(rutaDropbox('', f), rutaDropbox('/', f));
+  assert.equal(rutaDropbox(undefined, f).startsWith('/FACTURAS/'), true);
+});

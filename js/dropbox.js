@@ -13,7 +13,11 @@ const escribir = (k, v) => (v == null ? localStorage.removeItem(k) : localStorag
 
 export const appKey = () => (leer(K_APPKEY) || DROPBOX_APP_KEY || '').trim();
 export const setAppKey = (k) => escribir(K_APPKEY, (k || '').trim() || null);
-export const conectado = () => !!leer(K_TOKENS)?.refresh_token;
+// Un token solo vale para la app de Dropbox con la que se creó: si cambia la App key hay que reconectar.
+export const conectado = () => {
+  const t = leer(K_TOKENS);
+  return !!t?.refresh_token && (!t.client_id || t.client_id === appKey());
+};
 export const cuentaGuardada = () => leer(K_TOKENS)?.cuenta || null;
 export const redirectUri = () => new URL('./', location.href).href;
 
@@ -67,7 +71,7 @@ export async function canjearCodigo(code) {
     redirect_uri: redirectUri(),
   });
   escribir(K_PKCE, null);
-  escribir(K_TOKENS, tokens);
+  escribir(K_TOKENS, { ...tokens, client_id: appKey() });
 }
 
 async function pedirToken(campos) {
@@ -89,7 +93,7 @@ async function pedirToken(campos) {
 
 async function token(forzar = false) {
   const t = leer(K_TOKENS);
-  if (!t?.refresh_token) throw new SinConexion();
+  if (!conectado()) throw new SinConexion();
   if (!forzar && t.access_token && t.expira - Date.now() > 60_000) return t.access_token;
   try {
     const nuevo = await pedirToken({ grant_type: 'refresh_token', refresh_token: t.refresh_token, client_id: appKey() });

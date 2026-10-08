@@ -1,8 +1,10 @@
 // Preferencias pequeñas en localStorage.
 
+import { CARPETA_BASE } from './config.js';
+
 const K = 'cz.ajustes';
 const DEFECTO = {
-  carpeta: '/FACTURAS',
+  carpeta: CARPETA_BASE,
   destino: 'ambos', // 'ambos' | 'dropbox' | 'movil'
   filtro: 'documento',
   intensidad: 0.8, // 0 = suave, 1 = intenso
@@ -14,7 +16,12 @@ const DEFECTO = {
 };
 
 export function ajustes() {
-  try { return { ...DEFECTO, ...JSON.parse(localStorage.getItem(K) || '{}') }; } catch { return { ...DEFECTO }; }
+  try {
+    const a = { ...DEFECTO, ...JSON.parse(localStorage.getItem(K) || '{}') };
+    // Migración: quien guardó el valor por defecto antiguo pasa al de la configuración actual.
+    if (a.carpeta === '/FACTURAS' && CARPETA_BASE !== '/FACTURAS') a.carpeta = CARPETA_BASE;
+    return a;
+  } catch { return { ...DEFECTO }; }
 }
 
 export function guardarAjustes(cambios) {
