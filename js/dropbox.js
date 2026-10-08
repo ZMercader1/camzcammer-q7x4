@@ -33,7 +33,7 @@ export async function iniciarConexion() {
     code_challenge_method: 'S256',
     token_access_type: 'offline',
     // Solo escribir: la app no puede leer ni descargar nada de tu Dropbox.
-    scope: 'files.content.write account_info.read',
+    scope: 'files.content.write',
     redirect_uri: redirectUri(),
   });
   location.href = url.href;
@@ -68,7 +68,6 @@ export async function canjearCodigo(code) {
   });
   escribir(K_PKCE, null);
   escribir(K_TOKENS, tokens);
-  try { await cuenta(); } catch { /* la conexión vale aunque falle este dato */ }
 }
 
 async function pedirToken(campos) {

@@ -1196,7 +1196,7 @@ async function abrirAjustes() {
     <div class="grupo">
       <div class="grupo-titulo">Dropbox</div>
       ${dbx.conectado() ? `
-        <div class="dbx-ok">${icon('cloudCheck')}<div><b>Conectado</b><small>${esc(cuenta?.email || cuenta?.nombre || '')}</small></div>
+        <div class="dbx-ok">${icon('cloudCheck')}<div><b>Conectado</b><small>Solo puede guardar facturas</small></div>
           <button type="button" class="btn-texto peligro" id="aj-desconectar">Desconectar</button></div>`
       : `
         <button type="button" class="btn-primario ancho" id="aj-conectar" ${dbx.appKey() ? '' : 'disabled'}>${icon('cloud')}Conectar Dropbox</button>
@@ -1361,7 +1361,6 @@ async function iniciar() {
   else if (retorno?.error) toast(`Dropbox: ${retorno.error}`, 'error');
   else if (ajustes().empezarEnCamara && !ajustes().camaraNativa) abrirCamara();
 
-  if (dbx.conectado() && !dbx.cuentaGuardada()) dbx.cuenta().catch(() => {});
   // El lector de texto se descarga en segundo plano para que esté listo al escanear.
   if (ajustes().leerFacturas) setTimeout(precargar, 2500);
   sincronizarYA();
