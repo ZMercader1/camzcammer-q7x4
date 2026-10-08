@@ -156,3 +156,37 @@ test('nº de factura cuando el OCR lee el símbolo º como una comilla', () => {
   assert.equal(extraerRef('Factura Nº F260047'), 'F260047');
   assert.equal(extraerRef('Factura + 260702013172'), '260702013172');
 });
+
+test('importe: si el OCR inventa un dígito, manda el que cuadra con base + IVA', () => {
+  const ocr = `os 1 136,18
+lo 1 1,719
+rte 1 62,19
+p 21,00%
+P. 1 51,40
+IVA 1 10,79
+| reservado : 124,00 Eur
+| suminist. 1 672,19 Eur
+a: 07.10.26 Hora: 20:20`;
+  assert.equal(extraerImporte(ocr), 62.19);
+  // Sin desglose de IVA no se toca lo que dice el ticket.
+  assert.equal(extraerImporte('TOTAL 672,19 Eur'), 672.19);
+  // Un total que sí cuadra se respeta.
+  assert.equal(extraerImporte(`Base 44,69
+IVA 9,38
+TOTAL 54,07`), 54.07);
+});
+
+test('cabecera rota: no toma la dirección como nombre del comercio', () => {
+  const ocr = `LIWIL - AN 7
+enoil, $,A eze
+res Rieres, s/n Wa
+2 Esparrayuera
+a: 07/10/2026 20:70
+Producto : Sin Plomo 95
+Litros : 36,18
+Importe 62,19
+Total suminist. : 62,19 Eur`;
+  const r = analizar(ocr, { hoy: HOY });
+  assert.equal(r.proveedor, 'Gasolina');
+  assert.equal(r.importe, 62.19);
+});

@@ -30,8 +30,30 @@ function numeros(linea) {
   return out;
 }
 
+/**
+ * ¿Cuadra `total` con alguna pareja base + IVA del texto? Es la mejor comprobación contra un OCR
+ * que se inventa o pierde un dígito: base 51,40 + IVA 10,79 = 62,19, pero no 672,19.
+ */
+function cuadraConIva(total, nums) {
+  return nums.some((i) => i < total && nums.some((b) => {
+    const r = i / b;
+    return b < total && r >= 0.03 && r <= 0.25 && Math.abs(b + i - total) < 0.011;
+  }));
+}
+
 /** El total a pagar, o null. Misma lógica que la app iOS anterior (ImporteParser). */
 export function extraerImporte(texto) {
+  const elegido = elegirImporte(texto);
+  const todos = [...new Set(String(texto || '').split(/\r?\n/).flatMap(numeros))];
+  if (elegido != null && todos.length >= 3 && !cuadraConIva(elegido, todos)) {
+    // El elegido no cuadra con el desglose de IVA: si un solo número del ticket sí cuadra, ese es el total.
+    const buenos = todos.filter((c) => cuadraConIva(c, todos));
+    if (buenos.length === 1) return buenos[0];
+  }
+  return elegido;
+}
+
+function elegirImporte(texto) {
   const fuerte = [];
   const suave = [];
   const euro = [];
@@ -158,11 +180,11 @@ export function detectarTipo(texto) {
   return mejor;
 }
 
-const RUIDO = /\d+[.,]\d{2}|TOTAL|BASE|IMPONIBLE|IMPORTE|EUROS?\b|FACTURA|TICKET|SIMPLIFICADA|C\.?I\.?F|N\.?I\.?F|TEL[EÉF.:]|FECHA|HORA|CALLE|C\/|AVDA|AVENIDA|PLAZA|CTRA|CP\b|\d{5}|WWW|HTTP|@|GRACIAS|BIENVENID|CAJA|OPERADOR|ATENDIDO|MESA|COPIA|CLIENTE|DOCUMENTO|IVA|PAGINA/;
+const RUIDO = /\bS[\/ ]N\b|\d+[.,]\d{2}|TOTAL|BASE|IMPONIBLE|IMPORTE|EUROS?\b|FACTURA|TICKET|SIMPLIFICADA|C\.?I\.?F|N\.?I\.?F|TEL[EÉF.:]|FECHA|HORA|CALLE|C\/|AVDA|AVENIDA|PLAZA|CTRA|CP\b|\d{5}|WWW|HTTP|@|GRACIAS|BIENVENID|CAJA|OPERADOR|ATENDIDO|MESA|COPIA|CLIENTE|DOCUMENTO|IVA|PAGINA/;
 
 /** Nombre del comercio: la primera línea "de nombre" de la cabecera. */
 export function extraerComercio(texto) {
-  const lineas = String(texto || '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean).slice(0, 8);
+  const lineas = String(texto || '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean).slice(0, 3); // el comercio va en la cabecera; más abajo suele ser la dirección
   for (const l of lineas) {
     const n = norm(l);
     const letras = (n.match(/[A-Z]/g) || []).length;
